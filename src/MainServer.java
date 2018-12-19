@@ -1,45 +1,38 @@
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 
 /**
- *
- * @author Joserra
+ 
+  
+ * @author Jose Ramón Rodríguez Rodríguez & Javier Almodovar Villacañas
  */
 public class MainServer {
-
-   //Mensaje de entrada
-    public static final String Mensaje="Servidor HTTP/1.1 iniciando...";
+    //Mensaje de entrada
+    public static final String MSG_HANDSHAKE="Servidor HTTP/1.1 iniciándose...";
+    //Se establece servidor SOCKET como nulo
+    private static ServerSocket mMainServer= null;
     
-    //Establecemos servidor Socket como nulo
-    private static ServerSocket server=null;    
-    
-    public static void main(String[] args) throws IOException {
-        
-        try{
-            server = new ServerSocket(80);
-            System.out.println(Mensaje);
-            while(true){
-                Socket s=server.accept();
-                System.out.println("Conexion entrante desde: "+s.getInetAddress().toString());
-               HttpSocketConnection conn=new HttpSocketConnection(s);
-               new Thread((Runnable) conn).start();  
+     
+    public static void main(String[] args)  throws FileNotFoundException {//añadimos excepcion
+       
+        try {
+            
+            mMainServer= new ServerSocket(80);
+            System.out.println(MSG_HANDSHAKE);
+            while(true) {
+                Socket socket =mMainServer.accept();
+                 System.out.println("Conexión entrante desde: "+socket.getInetAddress().toString());
+                 //Creación de hebra
+                 Thread connection= new Thread(new HttpSocketConnection(socket));
+                 connection.start();
             }
-        }catch (UnknownHostException ex){
-                Logger.getLogger(MainServer.class.getName()).log(Level.SEVERE, null, ex);
-        }   catch (IOException ex){
-            Logger.getLogger(MainServer.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (java.net.BindException ex) {
+            System.err.println(ex.getMessage());
+        } catch (IOException ex2){
+            System.err.println(ex2.getMessage());
         }
-    }
-    
+    }  
 }

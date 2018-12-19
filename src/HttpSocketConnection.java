@@ -2,101 +2,219 @@
 
 
 
+import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.Date;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
-
 /**
  *
- * @author Joserra
+ * @author Jose Ramón Rodríguez Rodríguez & Javier Almodovar Villacañas
  */
 public class HttpSocketConnection implements Runnable{
-
-    Socket socket= null;
-    HttpSocketConnection(Socket s) {
-        socket=s;
-    }
-      @Override
-    public void run() {
-        DataOutputStream dos = null;
-        try {
-            System.out.println("Starting new HTTP connection with "+socket.getInetAddress().toString());
-            dos = new DataOutputStream(socket.getOutputStream());
-            //dos.write("200 OK".getBytes());
-            BufferedReader bis = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String line = bis.readLine();
-            System.out.println("SERVER ["+socket.getInetAddress().toString()+"] received>"+line);
-            String response="HTTP/1.1 200 OK\r\nContent-type:text/html\r\nConten-length:39\r\n\r\n";
-            String entity="<html><body><h1>HOLA</h1></body></html>";
-            try{
-            String path= analizeRequest(line);
-            
-            entity= readEntity(path);
-            
-            }catch(HttpException400 ex400){
-            }
-            catch(HttpException405 ex405){
-                System.err.println(ex405.getMessage());
-                response="HTTP/1.1 405 METHOD NOT SUPPORTED\r\nContent-type:text/html\r\nConten-length:38\r\n\r\n";
-                entity="<html><body><h1>405</h1></body></html>";
-            }
-            catch(HttpException505 ex505){
-            }
-            finally{
-            
-            dos.write(response.getBytes());
-            dos.flush();
-            dos.write(entity.getBytes());
-            dos.flush();
-            }
-        } catch (IOException ex) {
-            Logger.getLogger(HttpSocketConnection.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            try {
-                dos.close();
-                socket.close();
-            } catch (IOException ex) {
-                Logger.getLogger(HttpSocketConnection.class.getName()).log(Level.SEVERE, null, ex);
-            }
-        }
-        
-    }
+public static final String HTTP_Ok="200";
+    
+    //Declaramos los cuatro tipos de errores que nos saldran en la comprobacion telnet
+    public static final String HTTP_Bad_Request="400";
+    public static final String HTTP_Not_Found="404";
+    public static final String HTTP_Method_Not_Allowed="405";
+    public static final String HTTP_Version_Not_Supported="505";
+    
+    
+    Socket socket=null;
+    
     /**
-     * Este método analiza la lína de petición de HTTP/1.1
-     * @param request
-     * @return la ruta al recurso a enviar al cliente
-     * @throws HttpConnection.HttpException400
-     * @throws HttpConnection.HttpException405
-     * @throws HttpConnection.HttpException505 
+     * Se recibe el socket conectado con el cliente
+     * @param s Socket conectado con el cliente
      */
-    protected String analizeRequest(String request)throws HttpException400,HttpException405,HttpException505{
-    
-        if(!request.startsWith("GET ")) throw new HttpException405();
-    
-        return "/";
+    public HttpSocketConnection(Socket s){
+        socket = s;
     }
+    
+    
+    public void run() {
+        String request_line="";
+        BufferedReader input;
+        DataOutputStream output;
+        
 
-    private String readEntity(String path) throws HttpException404{
-        //Leer del fichero
+        //Definicion de las cabeceras de respuesta
+        String connection="";
+        String contentType="";
+        String server="";
         
-        return "<html><body><h1>405</h1></body></html>";
+        String resourceFile="";
+        String allow="";
+        String contentLength="";
         
+       
+        try {
+            byte[] outdata=null;
+            String outmesg="";
+            byte[] Recurso=null;
+            input = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            output = new DataOutputStream(socket.getOutputStream());
+           
+            
+            request_line= input.readLine();  
+                 String parts[]=request_line.split(" ");
+                
+                if(request_line.startsWith("GET ")){
+                  if(parts.length==3)
+                    {//Se comprueba la version
+                        String[] res;
+                        res=parts[2].split("/");
+                        //Damos validez a version 1 y version 1.1
+                        if(res[1].equals("1") || res[1].equals("1.1")){
+                             if(parts[1].equalsIgnoreCase("/")){//equalsIgnoreCase ignora mayusculas y minusculas
+                             resourceFile="index.html";
+                        }else{
+                            //parts[1] -->Tipo de contenido
+                            resourceFile=parts[1];
+                        }
+                        //Content-type
+                        //Separaremos parte1 y tipo de contenido a traves del "." de tipo de contenido
+                      
+                        String[] Separar;
+                    
+                        if(!parts[1].equals("/")){//Comparamos que part[1] sea diferente a "/"
+                        
+                        Separar= parts[1].split("\\.");//Para poder separar con punto necesitamos poner una barra "\\."
+                        
+                        if(Separar[1].equals("jpg")){
+                            contentType="\r\nContent-type: image/jpeg\r\n";
+                        }else if(Separar[1].equals("txt")){
+                            contentType="\r\nContent-type: text/plain\r\n";
+                        }else{
+                            //Como solo podremos disponibles 3, elegimos que si no es una imagen o texto plano, sea:
+                            contentType="\r\nContent-type: text/html\r\n";
+                        }
+                        }else{
+                            contentType="\r\nContent-type: text/html\r\n";
+                        }
+                          //Hemos tenido que crear una nueva variable porque nos sobreescribía outdata
+                       Recurso=leerRecurso(resourceFile);
+                        
+             
+                        
+                        if(Recurso==null)    {
+                            outmesg="HTTP/1.1 404\r\n\r\n<html><body><h1>No encontrado</h1></body></html>";
+                            outdata=outmesg.getBytes();    
+                        }else{
+                            //Si encuentra el recurso
+                            outmesg="HTTP/1.1 200";
+                            outdata=outmesg.getBytes();
+                        }
+             
+                    }else{
+                        outmesg="HTTP/1.1 505\r\n\r\n<html><body><h1>HTTP Version Not Supported</h1></body></html>";
+                        outdata=outmesg.getBytes();
+                        }
+                    }else{
+                      outmesg="HTTP/1.1 400\r\n\r\n<html><body><h1>Problema en el cliente</h1></body></html>";
+                      outdata=outmesg.getBytes();
+                    }
+                }else{
+                    outmesg="HTTP/1.1 405\r\n\r\n<html><body><h1>Metodo no permitido</h1></body></html>";
+                    outdata=outmesg.getBytes(); 
+                }
+                    
+                
+                   do{
+                request_line= input.readLine();        
+                //Escribe host...
+                System.out.println(request_line);
+            }while(request_line.compareTo("")!=0);
+            //CABECERAS.
+            //Las cabeceras se mandan después de la línea de estado.
+            
+            if(outmesg.equals("HTTP/1.1 200")){
+            //Cabecera content-length  -->El tamaño del contenido de la petición en bytes
+             contentLength="Content-Length: "+ Recurso.length + " \r\n";  
+             
+             //Cabecera CONNECTION
+             connection= "Connection: close \r\n"; //Para informar que no admite conexiones persistentes
+            
+            //Cabecera DATE
+           Date fecha = Fecha();
+            String cabeceraFecha= fecha + " \r\n";
+            
+            
+            //CABECERA ALLOW
+            allow="Allow: #GET\r\n"; //El propósito es informar al destinatario de los métodos de solicitud válidos 
+            
+           //Cabecera SERVER
+           server="Server: Servidor HTTP 1.1\r\n\r\n"; //Muestra el tipo de servidor HTTP empleado
+            
+            //Linea de estado
+               output.write(outdata);
+               
+               //Escribimos cabeceras
+               
+               output.write(contentType.getBytes()); 
+               output.write(contentLength.getBytes());
+               output.write(connection.getBytes());
+               output.write(cabeceraFecha.getBytes());
+               output.write(allow.getBytes());
+               output.write(server.getBytes());
+             
+            if(Recurso!=null){
+               //Recurso
+               output.write(Recurso);
+           } 
+           }else{
+               
+                //Linea de estado
+               output.write(outdata);
+               
+               if(Recurso!=null){
+               //Recurso
+               output.write(Recurso);
+           } 
+           }
+            input.close();
+            output.close();
+            socket.close();
+        
+        } catch (IOException e) {
+            System.err.println("Exception" + e.getMessage());
+        }
+        }
+
+    
+    private Date Fecha(){//Con este metodo obtenemos la fecha actual
+        java.util.Date fecha = new Date();
+        return fecha;
     }
     
-    public class HttpException400 extends IOException{}
-    public class HttpException404 extends IOException{}
-    public class HttpException405 extends IOException{}
-    public class HttpException505 extends IOException{}
+    
+    private byte[] leerRecurso(String resourceFile){        
+        //./ es para el directorio
+        File f= new File("./"+resourceFile);
+        byte[] bytesArray = null;
+        try{
+       FileInputStream fis = new FileInputStream (f);
+       bytesArray = new byte[(int) f.length()];
+       fis.read(bytesArray);
+       BufferedInputStream bis = new BufferedInputStream(fis);
+       bis.read(bytesArray, 0 , bytesArray.length);
+
+        }catch(IOException e) {
+            e.printStackTrace();
+        }  
+       return bytesArray;
+    }
+    
+    
+    
     
 }
+
