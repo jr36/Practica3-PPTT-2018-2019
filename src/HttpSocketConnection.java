@@ -20,13 +20,13 @@ import java.util.logging.Logger;
  * @author Jose Ramón Rodríguez Rodríguez & Javier Almodovar Villacañas
  */
 public class HttpSocketConnection implements Runnable{
-public static final String HTTP_Ok="200";
+public static final String HTTP_Ok="200"; //Mensaje de estado correcto
     
     //Declaramos los cuatro tipos de errores que nos saldran en la comprobacion telnet
-    public static final String HTTP_Bad_Request="400";
-    public static final String HTTP_Not_Found="404";
-    public static final String HTTP_Method_Not_Allowed="405";
-    public static final String HTTP_Version_Not_Supported="505";
+    public static final String HTTP_Bad_Request="400"; //Peticion incorrecta
+    public static final String HTTP_Not_Found="404"; //Recurso no encontrado
+    public static final String HTTP_Method_Not_Allowed="405"; //Metodo no soportado
+    public static final String HTTP_Version_Not_Supported="505"; //Version HTTP no valida, solo funciona HTTP 1.1
     
     
     Socket socket=null;
@@ -50,7 +50,7 @@ public static final String HTTP_Ok="200";
         String connection="";
         String contentType="";
         String server="";
-        
+        Date fecha = Fecha();
         String resourceFile="";
         String allow="";
         String contentLength="";
@@ -65,16 +65,15 @@ public static final String HTTP_Ok="200";
            
             
             request_line= input.readLine();  
-                 String parts[]=request_line.split(" ");
+            String parts[]=request_line.split(" ");//String parts separa la peticion en tres partes por un espacio-->Ejemplo [GET]" "[/index.html]" "[HTTP/1.1]
                 
                 if(request_line.startsWith("GET ")){
-                  if(parts.length==3)
+                  if(parts.length==3)//Si la peticion contiene tres partes
                     {//Se comprueba la version
                         String[] res;
-                        res=parts[2].split("/");
-                        //Damos validez a version 1 y version 1.1
-                        if(res[1].equals("1") || res[1].equals("1.1")){
-                             if(parts[1].equalsIgnoreCase("/")){//equalsIgnoreCase ignora mayusculas y minusculas
+                        res=parts[2].split("/");//Guardamos en String res la parte de la peticion que incluye la version HTTP y separa [HTTP]/[1.1] a traves del "/"
+                        if(res[1].equals("1.1")){ //Solo comprueba que version HTTP sea la 1.1. No permite ninguna otra version. En la peticion no es necesario las mayusculas al escribir http/1.1
+                             if(parts[1].equalsIgnoreCase("/")){//equalsIgnoreCase ignora que en la peticion se haya escrito /index.html, solo importa el index.html
                              resourceFile="index.html";
                         }else{
                             //parts[1] -->Tipo de contenido
@@ -144,15 +143,15 @@ public static final String HTTP_Ok="200";
              connection= "Connection: close \r\n"; //Para informar que no admite conexiones persistentes
             
             //Cabecera DATE
-           Date fecha = Fecha();
-            String cabeceraFecha= fecha + " \r\n";
+           
+            String cabeceraFecha="Date: "+ fecha + " \r\n";
             
             
             //CABECERA ALLOW
-            allow="Allow: #GET\r\n"; //El propósito es informar al destinatario de los métodos de solicitud válidos 
+            allow="Allow: #GET\r\n"; //El propósito es informar al destinatario de los métodos de solicitud válidos. Solo sera valido metodo GET
             
            //Cabecera SERVER
-           server="Server: Servidor HTTP 1.1\r\n\r\n"; //Muestra el tipo de servidor HTTP empleado
+           server="Server: Servidor HTTP 1.1\r\n\r\n"; //Muestra el tipo de servidor HTTP empleado. Siempre permite HTTP 1.1
             
             //Linea de estado
                output.write(outdata);
