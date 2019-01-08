@@ -73,7 +73,7 @@ public static final String HTTP_Ok="200"; //Mensaje de estado correcto
                         String[] res;
                         res=parts[2].split("/");//Guardamos en String res la parte de la peticion que incluye la version HTTP y separa [HTTP]/[1.1] a traves del "/"
                         if(res[1].equals("1.1")){ //Solo comprueba que version HTTP sea la 1.1. No permite ninguna otra version. En la peticion no es necesario las mayusculas al escribir http/1.1
-                             if(parts[1].equalsIgnoreCase("/")){//equalsIgnoreCase ignora que en la peticion se haya escrito /index.html, solo importa el index.html
+                             if(parts[1].equalsIgnoreCase("/")){//Si se introduce unicamente un "/", se utiliza por defecto el recurso "index.html"
                              resourceFile="index.html";
                         }else{
                             //parts[1] -->Tipo de contenido
